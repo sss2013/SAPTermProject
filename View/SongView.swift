@@ -1,0 +1,154 @@
+struct SongView: View{
+    @State private var viewModel = SongViewModel()
+    @State private var showingAddSheet = false
+
+    var body : some View {
+        NavigationStack(path: $viewModel.path) {
+            SongListView(viewModel: viewModel)
+            .navigationDestination(for: Song.self) { song in
+                SongDetailView(song: song)
+            }
+            .navigationTitle("노래")
+            .task {
+                await viewModel.loadSongs()
+            }
+            .refreshable {
+                await viewModel.loadSongs()
+            }
+            .toolbar {
+                Button {
+                    showingAddSheet.toggle()
+                } label : {
+                    Image(systemName: "plus.circle.fill")
+                }
+            }
+            .sheet(isPresented : $showingAddSheet) {
+                SongAddView(viewModel : viewModel)
+            }
+        }
+    }
+}
+
+struct SongListView: View{
+    let viewModel : SongViewModel
+
+    func deleteSong(offsets: IndexSet) {
+        Task { 
+            for index in offsets {
+                let song = viewModel.songs[index]
+                await viewModel.deleteSong(song)
+            }
+        }
+    }
+    
+    var body : some View {
+        List {
+            ForEach(viewModel.songs) { song in
+                NavigationLink(value: song) {
+                    HStack{
+                        VStack(alignment: .leading) {
+                            Text(song.title)
+                                .font(.headline)
+                        Text(song.singer)
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                    }
+                }
+            }
+        }
+        .onDelete(perform: deleteSong)
+        }
+    }
+}
+
+struct SongDetailView: View {
+    let song: Song
+    
+    var body: some View {
+        ScrollView{
+        VStack(alignment: .leading, spacing: 15) {
+            HStack{
+            Text(song.singer)
+                .font(.title2)
+                .foregroundColor(.secondary)
+            Spacer() 
+
+            Text(String(song.rating))
+                .font(.title)
+                .foregroundColor(.yellow)
+            Spacer()
+            }
+            .padding(.bottom,10)
+
+            Text(song.lyrics ?? "(가사 없음)")
+                .font(.body)
+                .multilineTextAlignment(.leading)
+        }
+        .padding()
+        }
+        .navigationTitle(song.title)
+        .navigationBarTitleDisplayMode(.large)
+    }
+}
+
+struct SongAddView : View {
+    let viewModel : SongViewModel
+
+    @Environment(\.dismiss) var dismiss
+
+    @State var title = ""
+    @State var singer = ""
+    @State var rating = 3
+    @State var lyrics = ""
+
+    var body : some View {
+        NavigationView{
+            Form {
+                Section(header : Text("노래 정보")) {
+                    TextField("제목", text: $title)
+                    TextField("가수", text: $singer)
+                }
+
+                Section(header : Text("선호도 *")) {
+                    Picker("별점", selection: $rating){
+                        ForEach(1...5, id: \.self) { score in
+                            Text("\(score) 점")
+                                .tag(score)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+
+                Section(header: Text("가사")) {
+                    TextEditor(text: $lyrics)
+                        .frame(height: 150)
+                }
+            }
+            .toolbar {
+            
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("추가") {
+                        let newSong = Song(
+                            id: UUID(),
+                            title: title,
+                            singer: singer,
+                            rating: rating,
+                            lyrics: lyrics
+                        )
+
+                        Task {
+                            await viewModel.addSong(newSong)
+                            dismiss()
+                        }
+                    }
+                    .disabled(title.isEmpty || singer.isEmpty)
+                }
+                 ToolbarItem(placement: .cancellationAction) {
+                    Button("취소") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
