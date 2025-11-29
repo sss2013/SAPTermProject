@@ -33,21 +33,32 @@ struct TodofukenView : View{
 struct TodofukenListView: View {
     let viewModel : TodofukenViewModel
     
+    var groupedTodofukens: [Region: [Todofuken]] {
+        Dictionary(grouping: viewModel.todofuken, by: { $0.region })
+    }
+    
     var body : some View {
-        List(viewModel.todofuken) { todofuken in
-            NavigationLink(value: todofuken) {
-                HStack{
-                    VStack(alignment: .leading) {
-                        Text(todofuken.name_ko)
-                            .font(.headline)
-                        Text(todofuken.name_ja)
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
+        List { 
+            ForEach(Region.allCases, id: \.self) { region in
+            if let items = groupedTodofukens[region], !items.isEmpty {
+                Section(header: Text(region.displayName)) {
+                    ForEach(items, id: \.self) { todofuken in
+                        NavigationLink(value: todofuken) {
+                            HStack{
+                                VStack(alignment: .leading) {
+                                    Text(todofuken.name_ko)
+                                        .font(.headline)
+                                    Text(todofuken.name_ja)
+                                        .font(.subheadline)
+                                        .foregroundColor(.gray)
+                            }
+                        }
                     }
                 }
             }
+            }
+            }
         }
-        
     }
 }
 
